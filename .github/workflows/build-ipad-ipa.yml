@@ -16,17 +16,22 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Restore manually uploaded source package when present
+      - name: Restore manual source package
+        shell: bash
         run: |
-          if [ -f phoenix-city-a-zone-ipad-source.zip.part01 ]; then
-            cat phoenix-city-a-zone-ipad-source.zip.part* > "$RUNNER_TEMP/phoenix-city-a-zone-ipad-source.zip"
-            /usr/bin/unzip -q "$RUNNER_TEMP/phoenix-city-a-zone-ipad-source.zip" -d "$GITHUB_WORKSPACE"
-          fi
+          set -euo pipefail
+          bundle="phoenix-city-a-zone-ipad-source-v2.zip"
+          for part in 01 02; do
+            test -f "$bundle.part$part" || { echo "::error::缺少 $bundle.part$part"; exit 1; }
+          done
+          cat "$bundle.part01" "$bundle.part02" > "$RUNNER_TEMP/$bundle"
+          /usr/bin/ditto -x -k "$RUNNER_TEMP/$bundle" "$GITHUB_WORKSPACE"
+          test -f package-lock.json || { echo "::error::还原后未找到 package-lock.json"; exit 1; }
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install web dependencies
