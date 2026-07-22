@@ -1,0 +1,70 @@
+name: Build iPad IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-ipad-ipa:
+    name: Build unsigned iPad IPA
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Restore manually uploaded source package when present
+        run: |
+          if [ -f phoenix-city-a-zone-ipad-source.zip.part01 ]; then
+            cat phoenix-city-a-zone-ipad-source.zip.part* > "$RUNNER_TEMP/phoenix-city-a-zone-ipad-source.zip"
+            /usr/bin/unzip -q "$RUNNER_TEMP/phoenix-city-a-zone-ipad-source.zip" -d "$GITHUB_WORKSPACE"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build and sync iPad project
+        run: |
+          npm run build
+          npm run ios:sync
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios/App
+        run: pod install
+
+      - name: Archive iPad app without signing
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/PhoenixCityAZone.xcarchive" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA for Aisi Assistant signing
+        run: |
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$RUNNER_TEMP/PhoenixCityAZone.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          /usr/bin/zip -qry phoenix-city-a-zone-ipad-unsigned.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phoenix-city-a-zone-ipad-unsigned-ipa
+          path: ${{ runner.temp }}/phoenix-city-a-zone-ipad-unsigned.ipa
+          if-no-files-found: error
