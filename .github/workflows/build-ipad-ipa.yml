@@ -20,7 +20,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bundle="phoenix-city-a-zone-ipad-source-v2.zip"
+          bundle="phoenix-city-a-zone-ipad-source-v3.zip"
           for part in 01 02; do
             test -f "$bundle.part$part" || { echo "::error::缺少 $bundle.part$part"; exit 1; }
           done
